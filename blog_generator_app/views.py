@@ -57,10 +57,10 @@ def generate_blog(request):
                 )
 
         # generate summary content using openai
-        # blog_content = generate_summary_content_openai(transcript)
+        blog_content = generate_summary_content_openai(transcript)
 
         # generate summary content using claude
-        blog_content = generate_summary_content_claude(transcript)
+        # blog_content = generate_summary_content_claude(transcript)
 
         # troubleshooting blog content
         if not blog_content:

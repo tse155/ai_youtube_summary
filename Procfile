@@ -1,0 +1,1 @@
+web: gunicorn ai_blog.wsgi:application --host 0.0.0.0 --port $PORT
