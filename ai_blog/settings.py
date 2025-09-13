@@ -91,19 +91,22 @@ WSGI_APPLICATION = "ai_blog.wsgi.application"
 load_dotenv()  # Load environment variables from .env file
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "postgres"),
-        "USER": os.environ.get("DB_USER", "postgres"),
-        "PASSWORD": os.environ.get("DB_PASS"),
-        "HOST": os.environ.get("DB_HOST", "db.zsfxjqehdrdhgwuooaks.supabase.co"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
-        #!In case IPV6 connection issue, use the alternative connection details through IPV4
         # "ENGINE": "django.db.backends.postgresql",
         # "NAME": os.environ.get("DB_NAME", "postgres"),
-        # "USER": os.environ.get("ALT_DB_USER", "postgres.zsfxjqehdrdhgwuooaks"),
+        # "USER": os.environ.get("DB_USER", "postgres"),
         # "PASSWORD": os.environ.get("DB_PASS"),
-        # "HOST": os.environ.get("ALT_DB_HOST", "aws-1-us-east-1.pooler.supabase.com"),
+        # "HOST": os.environ.get("DB_HOST", "db.zsfxjqehdrdhgwuooaks.supabase.co"),
         # "PORT": os.environ.get("DB_PORT", "5432"),
+        #!In case IPV6 connection issue, use the alternative connection details through IPV4
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DB_NAME", "postgres"),
+        "USER": os.environ.get("ALT_DB_USER", "postgres.zsfxjqehdrdhgwuooaks"),
+        "PASSWORD": os.environ.get("DB_PASS"),
+        "HOST": os.environ.get("ALT_DB_HOST", "aws-1-us-east-1.pooler.supabase.com"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "require",  # Add this line
+        },
     }
 }
 
