@@ -32,7 +32,7 @@
 
 
                         {% for article in blog_articles %}
-                        <a href="blog-details/{{ article.id }}/">
+                        <a href="{% url 'blog-details' article.id %}">
                             <div class="border border-gray-300 p-4 rounded-lg">
                                 <h3 class="text-lg font-semibold">"{{ article.youtube_title }}"</h3>
                                 <p>{{ article.generated_content|truncatewords:30 }}</p>
