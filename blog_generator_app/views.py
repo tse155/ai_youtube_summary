@@ -99,8 +99,8 @@ def blog_list(request):
 
 
 #! View for blog details
-def blog_details(request, pk):
-    blog_article_detail = BlogPost.objects.get(id=pk)
+def blog_details(request, blog_id):
+    blog_article_detail = BlogPost.objects.get(id=blog_id)
 
     # verifying whether the connected user is the owner of the blog post article
     if blog_article_detail.user == request.user:
