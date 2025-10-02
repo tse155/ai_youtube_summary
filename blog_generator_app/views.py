@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.conf import settings
 import json
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -19,6 +19,7 @@ import yt_dlp
 import urllib.request
 import re
 import os
+import traceback
 from dotenv import load_dotenv
 import assemblyai as aai
 import anthropic
@@ -45,6 +46,7 @@ def generate_blog(request):
             data = json.loads(request.body)
             yt_link = data["link"]
             yt_id = extract_video_id(yt_link)
+
         except (KeyError, json.JSONDecodeError):
             return JsonResponse({"error": "Invalid data sent"}, status=400)
 
@@ -60,12 +62,12 @@ def generate_blog(request):
             )
 
         # generate summary and title content using openai
-        # blog_content = generate_summary_content_openai(transcript)
-        # title= generate_tittle_content_openai(blog_content)
+        blog_content = generate_summary_content_openai(transcript)
+        title = generate_tittle_content_openai(blog_content)
 
         # generate summary an title content using claude
-        blog_content = generate_summary_content_claude(transcript)
-        title = generate_title_content_claude(blog_content)
+        # blog_content = generate_summary_content_claude(transcript)
+        # title = generate_title_content_claude(blog_content)
 
         # troubleshooting blog content
         if not blog_content:
@@ -132,17 +134,25 @@ def extract_video_id(url):
 
 def extract_yt_transcript(video_id):
     try:
-        transcript = YouTubeTranscriptApi.get_transcript(  # type: ignore
-            video_id,
-            languages=["en", "es"],  # Preferred languages
-        )
+        # NEW API - instantiate and use fetch()
+        ytt_api = YouTubeTranscriptApi()
+        transcript = ytt_api.fetch(video_id, languages=["en", "es"])
+
+        # The new API returns a FetchedTranscript object
+        # We need to extract the text from snippets
+        transcript_text = ""
+        for snippet in transcript.snippets:
+            transcript_text += snippet.text + " "
+
+        return transcript_text.strip()
+
     except NoTranscriptFound:
         return "No transcription available"
 
-    # Format transcript as plain text
-    formatter = TextFormatter()
-    transcript_text = formatter.format_transcript(transcript)
-    return transcript_text
+    except Exception as e:
+        print(f"Error extracting transcript: {str(e)}")
+        traceback.print_exc()  # type: ignore
+        return "No transcription available"
 
 
 def yt_title_dlp(link):
