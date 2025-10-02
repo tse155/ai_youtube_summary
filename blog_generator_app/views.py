@@ -8,6 +8,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, JsonResponse
 from django.conf import settings
 import json
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.formatters import TextFormatter
+from youtube_transcript_api._errors import (
+    TranscriptsDisabled,
+    NoTranscriptFound,
+    VideoUnavailable,
+)
 import yt_dlp
 import urllib.request
 import re
@@ -37,30 +44,28 @@ def generate_blog(request):
         try:
             data = json.loads(request.body)
             yt_link = data["link"]
+            yt_id = extract_video_id(yt_link)
         except (KeyError, json.JSONDecodeError):
             return JsonResponse({"error": "Invalid data sent"}, status=400)
 
-        # get yt title
-        title = yt_title(yt_link)
-
         # get yt transcript
-        transcript = yt_transcript(yt_link)
+        transcript = extract_yt_transcript(yt_id)
         if transcript in ("No transcription available", None, ""):
-            transcript = alternative_transcript(yt_link)
-            if transcript in (None, ""):
-                return JsonResponse(
-                    {
-                        "title": "Error",
-                        "content": "No transcription available for this video",
-                    },
-                    status=500,
-                )
+            return JsonResponse(
+                {
+                    "title": "Error",
+                    "content": "No transcription available for this video",
+                },
+                status=500,
+            )
 
-        # generate summary content using openai
-        blog_content = generate_summary_content_openai(transcript)
+        # generate summary and title content using openai
+        # blog_content = generate_summary_content_openai(transcript)
+        # title= generate_tittle_content_openai(blog_content)
 
-        # generate summary content using claude
-        # blog_content = generate_summary_content_claude(transcript)
+        # generate summary an title content using claude
+        blog_content = generate_summary_content_claude(transcript)
+        title = generate_title_content_claude(blog_content)
 
         # troubleshooting blog content
         if not blog_content:
@@ -114,20 +119,46 @@ def blog_details(request, pk):
 
 
 #!Aux views
-def yt_title(link):
+
+
+def extract_video_id(url):
+    """ "Extract the id from a youtube video link"""
+    if "v=" in url:
+        return url.split("v=")[-1].split("&")[0]
+    elif "youtu.be/" in url:
+        return url.split("youtu.be/")[-1].split("?")[0]
+    return url
+
+
+def extract_yt_transcript(video_id):
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(  # type: ignore
+            video_id,
+            languages=["en", "es"],  # Preferred languages
+        )
+    except NoTranscriptFound:
+        return "No transcription available"
+
+    # Format transcript as plain text
+    formatter = TextFormatter()
+    transcript_text = formatter.format_transcript(transcript)
+    return transcript_text
+
+
+def yt_title_dlp(link):
     """Fetch YouTube video title"""
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore
         info = ydl.extract_info(link, download=False)
         title = info.get("title", None)  # type: ignore
         return title if title else "Unknown Title"
 
 
-def yt_transcript(link):
+def yt_transcript_dlp(link):
     """Fetch YouTube video transcript"""
     ydl_opts = {
         "quiet": True,
@@ -137,7 +168,7 @@ def yt_transcript(link):
         "subtitleslangs": ["en"],
         "skip_download": True,
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore
         info = ydl.extract_info(link, download=False)
 
         # Check for subtitles
@@ -205,7 +236,7 @@ def download_youtube_audio(yt_link):
             "progress_hooks": [hook],
         }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore
             ydl.download([yt_link])
 
             return final_file
@@ -243,6 +274,22 @@ def generate_summary_content_claude(transcript):
     return response.content[0].text  # type: ignore
 
 
+def generate_title_content_claude(summary):
+    #! Anthropic setup
+    api_key = os.environ.get("CLAUDE_API_KEY")
+    client = anthropic.Anthropic(api_key=api_key)
+    prompt = f"""
+        Based on this summary, create a clear, concise video title (max 10 words):
+        \n\n{summary}\n\n
+    """
+    response = client.messages.create(
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=1000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text  # type: ignore
+
+
 def generate_summary_content_openai(transcript):
     #! OpenAI setup
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -251,6 +298,22 @@ def generate_summary_content_openai(transcript):
         Based on the following transcript from a YouTube video, generate a summary.
         Make sure the summary is well-structured, engaging, and informative:
         \n\n{transcript}\n\n
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        max_tokens=1000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.choices[0].message.content
+
+
+def generate_tittle_content_openai(summary):
+    #! OpenAI setup
+    api_key = os.environ.get("OPENAI_API_KEY")
+    client = OpenAI(api_key=api_key)
+    prompt = f"""
+        Based on this summary, create a clear, concise video title (max 10 words):
+        \n\n{summary}\n\n
     """
     response = client.chat.completions.create(
         model="gpt-4o-mini",
