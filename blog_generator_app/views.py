@@ -9,6 +9,7 @@ from django.http import JsonResponse
 from django.conf import settings
 import json
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
 from youtube_transcript_api.formatters import TextFormatter
 from youtube_transcript_api._errors import (
     TranscriptsDisabled,
@@ -135,7 +136,16 @@ def extract_video_id(url):
 def extract_yt_transcript(video_id):
     try:
         # NEW API - instantiate and use fetch()
-        ytt_api = YouTubeTranscriptApi()
+        # Using webshare residential proxy api
+        proxy_username = os.environ.get("WEBSHARE_PROXY_USERNAME")
+        proxy_password = os.environ.get("WEBSHARE_PROXY_PASSWORD")
+
+        ytt_api = YouTubeTranscriptApi(
+            proxy_config=WebshareProxyConfig(
+                proxy_username=proxy_username,  # type: ignore
+                proxy_password=proxy_password,  # type: ignore
+            )
+        )
         transcript = ytt_api.fetch(video_id, languages=["en", "es"])
 
         # The new API returns a FetchedTranscript object
